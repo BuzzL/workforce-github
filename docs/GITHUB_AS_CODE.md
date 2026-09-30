@@ -4,7 +4,7 @@ Status: **decided** by the maintainer on 2026-09-30 (see Decisions). The spike's
 
 ## Current state (read from the API, no changes made)
 
-All three repos (`workforce-infra`, `workforce-images`, `workforce-testbed`) are public, Apache-2.0, squash-only, delete-branch-on-merge, wiki off, secret scanning and push protection on. Each has a `main` ruleset with no bypass actors: deletion and non-fast-forward blocked, one code-owner approval, stale reviews dismissed on push, last-push approval, thread resolution, squash only, required status checks. `images` and `testbed` also have `protect-release-tags`. Environments still use `development` / `production` (renamed by IAT-20 after IAT-26).
+The four repos (`workforce-infra`, `workforce-images`, `workforce-testbed`, `workforce-github`) are public, Apache-2.0, squash-only, delete-branch-on-merge, wiki off, secret scanning and push protection on. Each has a `main` ruleset with no bypass actors: deletion and non-fast-forward blocked, one code-owner approval, stale reviews dismissed on push, last-push approval, thread resolution, squash only, required status checks. `images` and `testbed` also have `protect-release-tags`. `workforce-github` was created by hand and has none of this yet (no ruleset, merge commits allowed); it must be brought in line by hand before its first PR merges, then imported. Environments today: infra `development`, `management`, `management-plan`, `production`; images `agent-app`; testbed `agent-app`, `development`, `production`. The module takes environments as input; `development`/`production` are renamed by IAT-20 (IAT-26 decided the model).
 
 Consequence: everything the module must express already exists, so importing is the test of the module. A clean `terraform plan` after import proves it.
 
@@ -13,12 +13,12 @@ Consequence: everything the module must express already exists, so importing is 
 | Option | Verdict |
 |---|---|
 | Static PAT in GitHub secrets | Rejected: long-lived key, breaks the "no static keys" rule. |
-| GitHub App key in Secrets Manager or SSM, fetched by the CI job through the OIDC role | **Preferred.** Token is short-lived (1 h), key never leaves AWS, access is one more scoped IAM statement. |
+| GitHub App key in Secrets Manager or SSM, fetched by the CI job through the OIDC role | **Preferred.** The installation token is short-lived (1 h) and access is one more scoped IAM statement. The PEM itself is fetched onto the runner and held in memory by the provider (`app_auth`), so it does leave AWS for the job's lifetime. Stronger variant, not adopted yet: import the key into KMS, sign the App JWT with `kms:Sign`, and hand only the installation token to the provider. |
 | Maintainer token, local apply only | Fallback for what an App cannot do (see below). Explicit yes per apply. |
 
 The provider is configured with `app_auth` (App ID, installation ID, PEM) read at run time. None of those values is committed.
 
-Minimal App permissions for the repo settings in scope: repository *Administration* (write), *Environments* (write), *Secrets* (write), *Metadata* (read). *Administration* can change branch protection, collaborators and visibility and can delete repos, so a leaked key is close to full control of every repo it is installed on. Mitigations: a dedicated App separate from the agent App (IAT-23), installed only on `workforce-*` repos, key only readable by the apply role (not the plan role), apply behind the `management` environment approval.
+Expected minimal App permissions *(verify, the list is not exercised yet)*: repository *Administration* (write; also needed to create environments and set reviewers), *Environments* (write; environment secrets and variables), *Secrets* (write; repo-level secrets), *Variables* (write), *Metadata* (read). *Administration* can change branch protection, collaborators and visibility and can delete repos, so a leaked key is close to full control of every repo it is installed on. Mitigations: a dedicated App separate from the agent App (IAT-23), installed only on `workforce-*` repos, apply behind an environment approval. **Plan needs a credential too**: rulesets, environments and security settings are admin-scoped reads. The plan role therefore gets its own read-only App (Administration read, Environments read, Secrets read, Variables read, Metadata read), and only the apply role can read the write App's key.
 
 ## Personal account vs organization
 
@@ -30,7 +30,7 @@ Minimal App permissions for the repo settings in scope: repository *Administrati
 | Secrets and variables per repo/environment | Possible | Possible, plus org-level secrets and rulesets |
 | CODEOWNERS teams | Not available | Available |
 
-Proposed handling: one variable `owner_type = "user" | "organization"`. Org-only resources sit behind `count = owner_type == "organization" ? 1 : 0`. On a personal account repos are **created by hand once and imported**; the module supports `create = false` semantics through import, and the docs list the manual step. This keeps the App key free of a token that can create arbitrary repos.
+Superseded by Decision 2 below for repo creation. Still valid: one variable `owner_type = "user" | "organization"`. Org-only resources sit behind `count = owner_type == "organization" ? 1 : 0`. (The earlier proposal to create personal repos by hand and import them was rejected.) Another creation path exists: `POST /user/repos` accepts a GitHub App *user access token* (8 h, device flow), sitting between an installation token and a `gh` token *(verify)*.
 
 The maintainer account also belongs to one organization, which may allow the "org" leg of the done-criteria to be tested without creating one. Not touched yet, needs an explicit yes.
 
@@ -38,9 +38,14 @@ The maintainer account also belongs to one organization, which may allow the "or
 
 Decided: a separate repo, `workforce-github`. It reuses the state bucket but keeps `workforce-infra` scoped to AWS. Cost: the plan/apply gates are duplicated here.
 
+## Guard rails
+
+- The App can delete repos (Administration) but cannot create them on a personal account, so a planned replacement of `github_repository` would delete and then fail. The module sets `lifecycle { prevent_destroy = true }` and `archive_on_destroy = true`, and CI only applies a plan with no creates or deletes of repositories (creation stays a local apply).
+- Secret values end up in Terraform state. Secrets are in scope only for values that are not sensitive to the state bucket's readers, or are created out of band and referenced by name; decided in the module PR.
+
 ## Import check
 
-Not run yet. Plan: write the module, import the three repos, expect no diff. Known risk: ruleset `integration_id` for required checks (15368, GitHub Actions) and `required_reviewers` must be expressible in the provider, otherwise the plan will show drift.
+Not run yet. Plan: write the module, import the three repos, expect no diff. Known risks: `require_extra_approval_for_unattributed_changes` is true on infra and testbed but false on images, so one default gives a diff somewhere (make it an input); ruleset `integration_id` for required checks (15368, GitHub Actions) and `required_reviewers` must be expressible in the provider, otherwise the plan will show drift.
 
 ## Decisions (maintainer, 2026-09-30)
 
