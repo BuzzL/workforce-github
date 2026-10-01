@@ -10,6 +10,10 @@ GitHub as code for the AI Workforce: Terraform that manages the `workforce-*` re
 - Protection of an environment is the only guard on the role it unlocks: an apply environment has a required reviewer, no admin bypass and `main` only; a plan environment has no reviewer and must only ever unlock a read-only role.
 - Environment names are the lowercase names used everywhere else (`test`, `qa`, `demo`, account names, `<name>-plan`).
 
+## Scope
+
+This repo is the **GitHub provider** side of the workforce: repos, rulesets, GitHub Environments. AWS resources (accounts, roles, the state bucket, the OIDC roles this repo's CI assumes) are the **AWS provider** side and live in `workforce-infra`; a cross-repo need is one PR per repo. Secrets are not managed in Terraform (the values would land in the state); they are set out of band.
+
 ## Layout
 
 - `live/` and `modules/` are the only places Terraform may live: `scripts/stacks.sh` fails on a `.tf` anywhere else, so no gate can skip it.
