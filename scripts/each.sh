@@ -40,6 +40,27 @@ check_versions() {
   return "$rc"
 }
 
+# A secret written through Terraform is kept in the state, in a bucket other roles can read:
+# secrets are set out of band (docs/GITHUB_AS_CODE.md), so no *_secret resource may exist.
+check_no_secrets() {
+  local d=$1 f
+  # Newlines are removed first so that `resource` and its type on separate lines match too;
+  # .tf.json files are read the same way. A guard rail, not a guarantee: it cannot see a
+  # secret reached through a module from another source, which `terraform test` and review
+  # must catch.
+  for f in "$d"/*.tf "$d"/*.tf.json; do
+    [ -f "$f" ] || continue
+    case "$f" in
+      *.tf.json) pattern='"github_[a-z_]*secret' ;;
+      *)         pattern='resource[[:space:]]*"?[[:space:]]*github_[a-z_]*secret' ;;
+    esac
+    if tr -d '\n' <"$f" | grep -qE "$pattern"; then
+      echo "$d: a GitHub secret resource would put the value in the Terraform state; set secrets out of band ($f)"
+      return 1
+    fi
+  done
+}
+
 # Dependabot fails on missing directories, so each stack that declares providers is added
 # to its terraform block by the PR that creates it. This makes forgetting that fail.
 check_dependabot() {
@@ -86,7 +107,7 @@ while IFS= read -r d; do
         terraform -chdir="$d" test
       fi
       ;;
-    versions)    check_versions "$d" || status=1 ;;
+    versions)    check_versions "$d" || status=1; check_no_secrets "$d" || status=1 ;;
     dependabot)  check_dependabot "$d" || status=1 ;;
     *) echo "unknown gate: $gate" >&2; exit 2 ;;
   esac

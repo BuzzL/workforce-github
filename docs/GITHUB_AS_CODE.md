@@ -41,7 +41,7 @@ Decided: a separate repo, `workforce-github`. It reuses the state bucket but kee
 ## Guard rails
 
 - The App can delete repos (Administration) but cannot create them on a personal account, so a planned replacement of `github_repository` would delete and then fail. The module sets `lifecycle { prevent_destroy = true }` and `archive_on_destroy = true`, and CI only applies a plan with no creates or deletes of repositories (creation stays a local apply).
-- Secret values end up in Terraform state. Secrets are in scope only for values that are not sensitive to the state bucket's readers, or are created out of band and referenced by name; decided in the module PR.
+- Secret values end up in Terraform state. **Decided: secrets are not managed in Terraform.** `integrations/github` v6.13.0 has no write-only attribute or ephemeral resource for environment secrets, and Terraform cannot seal a value with GitHub's public key itself, so any value it writes lands in the state. The environments and their protection are in Terraform (`modules/github-environment`); the secrets (`AWS_ROLE_ARN`, `AWS_ROLE_ID`, `STATE_BUCKET`) are set out of band by `scripts/set-account-environment-secrets.sh` in workforce-infra from the stack outputs, and only their names are checked. `make versions` fails if a `github_*secret*` resource appears in a stack or module (a guard rail: it cannot see one reached through a module from elsewhere, so review still has to), and the module rejects variable names that look like secrets, because variables are not masked in a public repo's logs. Rejected: SOPS-encrypted values decrypted by Terraform (the values still reach the state, and the ciphertext would be public), pre-sealed `encrypted_value` (needs a script anyway).
 
 ## Import check
 
