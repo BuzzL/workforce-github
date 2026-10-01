@@ -6,3 +6,11 @@ updates:
       interval: weekly
     commit-message:
       prefix: ci
+  # Each Terraform stack or module adds its directory in the PR that creates it:
+  # Dependabot fails on directories that do not exist yet (make dependabot checks it).
+  - package-ecosystem: terraform
+    directory: /modules/github-environment
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: build
