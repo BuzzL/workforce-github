@@ -35,3 +35,10 @@ override.tf.json
 *_override.tf.json
 .terraformrc
 terraform.rc
+
+# GitHub App private keys and Terraform plans: never in the repository (the App key lives in AWS)
+*.pem
+*.key
+tfplan
+*.sops.yaml.dec
+*.dec

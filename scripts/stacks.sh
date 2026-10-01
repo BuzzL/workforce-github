@@ -15,6 +15,16 @@ dirs() {
   done | sort -u
 }
 
+# Every directory with Terraform must be under live/ or modules/: anywhere else the gates
+# (validate, lint, test, versions, dependabot) would silently skip it.
+stray=$(find . \( -name .terraform -o -name .git -o -name live -o -name modules \) -prune -o \
+  \( -name '*.tf' -o -name '*.tf.json' \) -print | sort)
+if [ -n "$stray" ]; then
+  echo "Terraform outside live/ and modules/ is not checked by any gate:" >&2
+  echo "$stray" >&2
+  exit 1
+fi
+
 case "${1:-all}" in
   roots)   dirs live ;;
   modules) dirs modules ;;

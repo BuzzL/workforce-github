@@ -67,8 +67,6 @@ jobs:
         with:
           tflint_version: ${{ env.TFLINT_VERSION }}
       - run: make lint
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   trivy:
     runs-on: ubuntu-latest

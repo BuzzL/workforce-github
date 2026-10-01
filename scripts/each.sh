@@ -22,9 +22,19 @@ check_versions() {
     echo "$d: required_version must be \">= 1.9\" (or higher) in a .tf file"
     rc=1
   fi
+  # The pin must sit inside the integrations/github entry of required_providers, not in
+  # any other provider's block: awk follows the braces of that entry.
   if grep -qE 'integrations/github' "$d"/*.tf 2>/dev/null &&
-    ! grep -qE 'version[[:space:]]*=[[:space:]]*"~>[[:space:]]*6(\.[0-9]+)*"' "$d"/*.tf; then
-    echo "$d: the integrations/github provider must be pinned to \"~> 6\""
+    ! awk '
+      /github[[:space:]]*=[[:space:]]*\{/ { inb = 1; depth = 0 }
+      inb {
+        if ($0 ~ /version[[:space:]]*=[[:space:]]*"~>[[:space:]]*6(\.[0-9]+)*"/) ok = 1
+        n = gsub(/\{/, "{"); m = gsub(/\}/, "}"); depth += n - m
+        if (depth <= 0) inb = 0
+      }
+      END { exit ok ? 0 : 1 }
+    ' "$d"/*.tf; then
+    echo "$d: the integrations/github provider must be pinned to \"~> 6\" in its own required_providers entry"
     rc=1
   fi
   return "$rc"
