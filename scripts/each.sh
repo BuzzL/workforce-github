@@ -43,11 +43,22 @@ check_versions() {
 # A secret written through Terraform is kept in the state, in a bucket other roles can read:
 # secrets are set out of band (docs/GITHUB_AS_CODE.md), so no *_secret resource may exist.
 check_no_secrets() {
-  local d=$1
-  if grep -qE 'resource[[:space:]]+"github_[a-z_]*secret[a-z_]*"' "$d"/*.tf 2>/dev/null; then
-    echo "$d: a GitHub secret resource would put the value in the Terraform state; set secrets out of band"
-    return 1
-  fi
+  local d=$1 f
+  # Newlines are removed first so that `resource` and its type on separate lines match too;
+  # .tf.json files are read the same way. A guard rail, not a guarantee: it cannot see a
+  # secret reached through a module from another source, which `terraform test` and review
+  # must catch.
+  for f in "$d"/*.tf "$d"/*.tf.json; do
+    [ -f "$f" ] || continue
+    case "$f" in
+      *.tf.json) pattern='"github_[a-z_]*secret' ;;
+      *)         pattern='resource[[:space:]]*"?[[:space:]]*github_[a-z_]*secret' ;;
+    esac
+    if tr -d '\n' <"$f" | grep -qE "$pattern"; then
+      echo "$d: a GitHub secret resource would put the value in the Terraform state; set secrets out of band ($f)"
+      return 1
+    fi
+  done
 }
 
 # Dependabot fails on missing directories, so each stack that declares providers is added

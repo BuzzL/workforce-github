@@ -10,6 +10,7 @@ run "apply_environment_is_protected" {
     environment         = "security"
     reviewer_user_ids   = [6116516]
     can_admins_bypass   = false
+    prevent_self_review = false
     deployment_branches = ["main"]
     variables           = { AWS_REGION = "eu-west-1" }
   }
@@ -22,6 +23,11 @@ run "apply_environment_is_protected" {
   assert {
     condition     = github_repository_environment.this.can_admins_bypass == false
     error_message = "Administrators must not be able to bypass the protection of an apply environment."
+  }
+
+  assert {
+    condition     = github_repository_environment.this.prevent_self_review == false
+    error_message = "The maintainer is the only reviewer, so self review must stay allowed."
   }
 
   assert {
@@ -78,6 +84,7 @@ run "team_reviewers_need_an_organization" {
     repository        = "workforce-infra"
     environment       = "demo"
     reviewer_team_ids = [42]
+    can_admins_bypass = false
   }
 
   expect_failures = [var.reviewer_team_ids]
@@ -91,6 +98,7 @@ run "team_reviewers_work_for_an_organization" {
     environment       = "demo"
     owner_type        = "organization"
     reviewer_team_ids = [42]
+    can_admins_bypass = false
   }
 
   assert {
@@ -103,9 +111,49 @@ run "environment_name_must_be_lowercase" {
   command = plan
 
   variables {
-    repository  = "workforce-infra"
-    environment = "Security"
+    repository        = "workforce-infra"
+    environment       = "Security"
+    can_admins_bypass = false
   }
 
   expect_failures = [var.environment]
+}
+
+run "variables_must_not_look_like_secrets" {
+  command = plan
+
+  variables {
+    repository        = "workforce-infra"
+    environment       = "security"
+    can_admins_bypass = false
+    variables         = { AWS_ROLE_ARN = "x" }
+  }
+
+  expect_failures = [var.variables]
+}
+
+run "variable_names_are_validated" {
+  command = plan
+
+  variables {
+    repository        = "workforce-infra"
+    environment       = "security"
+    can_admins_bypass = false
+    variables         = { GITHUB_REGION = "x" }
+  }
+
+  expect_failures = [var.variables]
+}
+
+run "at_most_six_reviewers" {
+  command = plan
+
+  variables {
+    repository        = "workforce-infra"
+    environment       = "security"
+    can_admins_bypass = false
+    reviewer_user_ids = [1, 2, 3, 4, 5, 6, 7]
+  }
+
+  expect_failures = [var.reviewer_user_ids]
 }

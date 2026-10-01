@@ -28,6 +28,17 @@ variable "reviewer_user_ids" {
   description = "Numeric GitHub IDs of the users who must approve a deployment. Empty for an environment that needs no approval (a plan environment). Public IDs, not secrets."
   type        = list(number)
   default     = []
+
+  validation {
+    condition     = alltrue([for id in var.reviewer_user_ids : id > 0 && id == floor(id)])
+    error_message = "User IDs must be positive whole numbers."
+  }
+
+  # GitHub allows at most 6 reviewers (users and teams together) and rejects more at apply time.
+  validation {
+    condition     = length(var.reviewer_user_ids) + length(var.reviewer_team_ids) <= 6
+    error_message = "An environment can have at most 6 reviewers."
+  }
 }
 
 variable "reviewer_team_ids" {
@@ -42,9 +53,8 @@ variable "reviewer_team_ids" {
 }
 
 variable "can_admins_bypass" {
-  description = "Whether repository admins can bypass the protection rules. False for an environment that unlocks a role that can write."
+  description = "Whether repository admins can bypass the protection rules. Required, no default: GitHub's own default is true, so every call states it. False for an environment that unlocks a role that can write; true only reproduces an existing bare environment."
   type        = bool
-  default     = false
 }
 
 variable "prevent_self_review" {
@@ -65,7 +75,17 @@ variable "deployment_branches" {
 }
 
 variable "variables" {
-  description = "Plain (non-secret) environment variables, name to value, such as AWS_REGION. Secrets are never set here: their values would end up in the Terraform state."
+  description = "Plain (non-secret) environment variables, name to value, such as AWS_REGION. Variables are not masked in the logs of a public repository and live in the Terraform state: a name that looks like a secret or one of the values CI keeps secret is rejected."
   type        = map(string)
   default     = {}
+
+  validation {
+    condition     = alltrue([for k in keys(var.variables) : can(regex("^[A-Za-z_][A-Za-z0-9_]*$", k)) && !startswith(upper(k), "GITHUB_")])
+    error_message = "A variable name uses letters, digits and underscores, does not start with a digit and does not start with GITHUB_."
+  }
+
+  validation {
+    condition     = alltrue([for k in keys(var.variables) : !can(regex("(?i)(secret|token|key|password|role_arn|role_id|state_bucket)", k))])
+    error_message = "That name looks like a secret (secret, token, key, password, role ARN or ID, state bucket): secrets are set out of band, not as variables."
+  }
 }
