@@ -4,12 +4,23 @@ variable "repository" {
 }
 
 variable "environment" {
-  description = "Name of the environment. Lowercase, as everywhere else: test, qa, demo, an account name or <name>-plan."
+  description = "Name of the environment. Lowercase, as everywhere else: test, qual, demo, an account name or <name>-plan. The deployable environments (test, qual, demo) are exactly four lowercase letters."
   type        = string
 
   validation {
     condition     = can(regex("^[a-z][a-z0-9-]{1,38}$", var.environment))
     error_message = "The environment name must be lowercase letters, digits or hyphens."
+  }
+}
+
+variable "deployable" {
+  description = "Whether this is a deployable environment (test, qual, demo). Those are exactly four lowercase letters (^[a-z]{4}$), so AWS policies and role-name patterns can match them strictly. Account environments (security, workforce, management) and <name>-plan are not deployable and keep their names."
+  type        = bool
+  default     = false
+
+  validation {
+    condition     = !var.deployable || can(regex("^[a-z]{4}$", var.environment))
+    error_message = "A deployable environment name must be exactly four lowercase letters (test, qual, demo)."
   }
 }
 

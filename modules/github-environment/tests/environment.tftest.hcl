@@ -157,3 +157,52 @@ run "at_most_six_reviewers" {
 
   expect_failures = [var.reviewer_user_ids]
 }
+
+# Deployable environments are exactly four lowercase letters, so AWS policies and role-name
+# patterns can match them strictly. The retired qa is two letters and is refused.
+run "a_deployable_environment_accepts_qual" {
+  command = apply
+
+  variables {
+    repository  = "workforce-testbed"
+    environment = "qual"
+    deployable  = true
+
+    can_admins_bypass = true
+  }
+
+  assert {
+    condition     = github_repository_environment.this.environment == "qual"
+    error_message = "The qual environment must be created under that name."
+  }
+}
+
+run "a_deployable_environment_must_be_four_letters" {
+  command = plan
+
+  variables {
+    repository  = "workforce-testbed"
+    environment = "qa"
+    deployable  = true
+
+    can_admins_bypass = true
+  }
+
+  expect_failures = [var.deployable]
+}
+
+run "a_non_deployable_environment_keeps_its_name" {
+  command = plan
+
+  variables {
+    repository  = "workforce-infra"
+    environment = "security-plan"
+
+    can_admins_bypass = true
+  }
+
+  assert {
+    condition     = github_repository_environment.this.environment == "security-plan"
+    error_message = "Account and plan environments are not deployable and are not subject to the four-letter rule."
+  }
+}
