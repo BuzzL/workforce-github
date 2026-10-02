@@ -4,23 +4,25 @@ variable "repository" {
 }
 
 variable "environment" {
-  description = "Name of the environment. Lowercase, as everywhere else: test, qual, demo, an account name or <name>-plan. The deployable environments (test, qual, demo) are exactly four lowercase letters."
+  description = "Name of the environment. Lowercase, as everywhere else: test, qual, demo, an account name or <name>-plan. Exactly four lowercase letters (test, qual, demo), <name>-plan, or one of management, security, workforce, agent-app."
   type        = string
 
   validation {
     condition     = can(regex("^[a-z][a-z0-9-]{1,38}$", var.environment))
     error_message = "The environment name must be lowercase letters, digits or hyphens."
   }
-}
 
-variable "deployable" {
-  description = "Whether this is a deployable environment (test, qual, demo). Those are exactly four lowercase letters (^[a-z]{4}$), so AWS policies and role-name patterns can match them strictly. Account environments (security, workforce, management) and <name>-plan are not deployable and keep their names."
-  type        = bool
-  default     = false
-
+  # A deployable environment is exactly four lowercase letters (test, qual, demo), so AWS
+  # policies and role-name patterns can match it strictly. The only other names are the plan
+  # environment of any of them (<name>-plan) and the named exceptions that are accounts or
+  # the release App, not deployable environments. A new exception is a reviewed change here.
   validation {
-    condition     = !var.deployable || can(regex("^[a-z]{4}$", var.environment))
-    error_message = "A deployable environment name must be exactly four lowercase letters (test, qual, demo)."
+    condition = (
+      can(regex("^[a-z]{4}$", var.environment)) ||
+      can(regex("^[a-z][a-z0-9]*-plan$", var.environment)) ||
+      contains(["management", "security", "workforce", "agent-app"], var.environment)
+    )
+    error_message = "An environment name must be exactly four lowercase letters (test, qual, demo), <name>-plan, or one of management, security, workforce, agent-app."
   }
 }
 

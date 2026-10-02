@@ -158,16 +158,15 @@ run "at_most_six_reviewers" {
   expect_failures = [var.reviewer_user_ids]
 }
 
-# Deployable environments are exactly four lowercase letters, so AWS policies and role-name
-# patterns can match them strictly. The retired qa is two letters and is refused.
-run "a_deployable_environment_accepts_qual" {
+# An environment name is exactly four lowercase letters (^[a-z]{4}$) unless it is a plan
+# environment (<name>-plan) or a named exception, so AWS policies and role-name patterns can
+# match the deployable ones strictly. Nothing has to opt in: a new stack cannot skip the rule.
+run "qual_is_accepted" {
   command = apply
 
   variables {
-    repository  = "workforce-testbed"
-    environment = "qual"
-    deployable  = true
-
+    repository        = "workforce-testbed"
+    environment       = "qual"
     can_admins_bypass = true
   }
 
@@ -177,32 +176,68 @@ run "a_deployable_environment_accepts_qual" {
   }
 }
 
-run "a_deployable_environment_must_be_four_letters" {
+run "the_retired_qa_is_refused" {
   command = plan
 
   variables {
-    repository  = "workforce-testbed"
-    environment = "qa"
-    deployable  = true
-
+    repository        = "workforce-testbed"
+    environment       = "qa"
     can_admins_bypass = true
   }
 
-  expect_failures = [var.deployable]
+  expect_failures = [var.environment]
 }
 
-run "a_non_deployable_environment_keeps_its_name" {
+run "a_longer_name_that_is_not_an_exception_is_refused" {
   command = plan
 
   variables {
-    repository  = "workforce-infra"
-    environment = "security-plan"
+    repository        = "workforce-testbed"
+    environment       = "staging"
+    can_admins_bypass = true
+  }
 
+  expect_failures = [var.environment]
+}
+
+run "a_hyphenated_name_that_is_not_a_plan_environment_is_refused" {
+  command = plan
+
+  variables {
+    repository        = "workforce-testbed"
+    environment       = "qa-stage"
+    can_admins_bypass = true
+  }
+
+  expect_failures = [var.environment]
+}
+
+run "plan_and_named_exception_environments_keep_their_names" {
+  command = plan
+
+  variables {
+    repository        = "workforce-infra"
+    environment       = "management-plan"
     can_admins_bypass = true
   }
 
   assert {
-    condition     = github_repository_environment.this.environment == "security-plan"
-    error_message = "Account and plan environments are not deployable and are not subject to the four-letter rule."
+    condition     = github_repository_environment.this.environment == "management-plan"
+    error_message = "A <name>-plan environment is not subject to the four-letter rule."
+  }
+}
+
+run "an_account_environment_keeps_its_name" {
+  command = plan
+
+  variables {
+    repository        = "workforce-infra"
+    environment       = "workforce"
+    can_admins_bypass = true
+  }
+
+  assert {
+    condition     = github_repository_environment.this.environment == "workforce"
+    error_message = "An account environment is a named exception and keeps its name."
   }
 }
