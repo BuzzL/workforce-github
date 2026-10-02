@@ -158,21 +158,22 @@ run "at_most_six_reviewers" {
   expect_failures = [var.reviewer_user_ids]
 }
 
-# An environment name is exactly four lowercase letters (^[a-z]{4}$) unless it is a plan
-# environment (<name>-plan) or a named exception, so AWS policies and role-name patterns can
-# match the deployable ones strictly. Nothing has to opt in: a new stack cannot skip the rule.
-run "qual_is_accepted" {
+# Environment names are explanatory and come from an explicit allowlist: test, quality, demo,
+# management, security, workforce, agent-app, and <name>-plan of the first six. The four-letter
+# keys of workforce-infra (qual among them) are for AWS naming conventions and are not names.
+# Nothing has to opt in: a new stack cannot skip the rule.
+run "quality_is_accepted" {
   command = apply
 
   variables {
     repository        = "workforce-testbed"
-    environment       = "qual"
+    environment       = "quality"
     can_admins_bypass = true
   }
 
   assert {
-    condition     = github_repository_environment.this.environment == "qual"
-    error_message = "The qual environment must be created under that name."
+    condition     = github_repository_environment.this.environment == "quality"
+    error_message = "The quality environment must be created under that name."
   }
 }
 
@@ -188,7 +189,19 @@ run "the_retired_qa_is_refused" {
   expect_failures = [var.environment]
 }
 
-run "a_longer_name_that_is_not_an_exception_is_refused" {
+run "the_key_qual_is_not_a_name" {
+  command = plan
+
+  variables {
+    repository        = "workforce-testbed"
+    environment       = "qual"
+    can_admins_bypass = true
+  }
+
+  expect_failures = [var.environment]
+}
+
+run "a_name_outside_the_allowlist_is_refused" {
   command = plan
 
   variables {
@@ -212,7 +225,19 @@ run "a_hyphenated_name_that_is_not_a_plan_environment_is_refused" {
   expect_failures = [var.environment]
 }
 
-run "plan_and_named_exception_environments_keep_their_names" {
+run "the_plan_environment_of_agent_app_does_not_exist" {
+  command = plan
+
+  variables {
+    repository        = "workforce-testbed"
+    environment       = "agent-app-plan"
+    can_admins_bypass = true
+  }
+
+  expect_failures = [var.environment]
+}
+
+run "plan_environments_keep_their_names" {
   command = plan
 
   variables {
@@ -223,7 +248,7 @@ run "plan_and_named_exception_environments_keep_their_names" {
 
   assert {
     condition     = github_repository_environment.this.environment == "management-plan"
-    error_message = "A <name>-plan environment is not subject to the four-letter rule."
+    error_message = "A <name>-plan environment of an allowed name is accepted."
   }
 }
 
@@ -238,6 +263,6 @@ run "an_account_environment_keeps_its_name" {
 
   assert {
     condition     = github_repository_environment.this.environment == "workforce"
-    error_message = "An account environment is a named exception and keeps its name."
+    error_message = "An account environment keeps its name."
   }
 }
