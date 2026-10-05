@@ -159,7 +159,7 @@ run "at_most_six_reviewers" {
 }
 
 # Environment names are explanatory and come from an explicit allowlist: test, quality, demo,
-# management, security, workforce, agent-app, and <name>-plan of the first six. The four-letter
+# management, security, workforce, github, agent-app, and <name>-plan of the first seven. The four-letter
 # keys of workforce-infra (qual among them) are for AWS naming conventions and are not names.
 # Nothing has to opt in: a new stack cannot skip the rule.
 run "quality_is_accepted" {
@@ -288,5 +288,20 @@ run "outputs_mirror_the_protection" {
   assert {
     condition     = output.environment == "test" && output.can_admins_bypass == false && output.reviewer_user_ids == toset([6116516]) && output.deployment_branches == toset(["main"])
     error_message = "The outputs must mirror the protection of the environment."
+  }
+}
+
+run "the_github_stack_environments_are_accepted" {
+  command = plan
+
+  variables {
+    repository        = "workforce-github"
+    environment       = "github-plan"
+    can_admins_bypass = true
+  }
+
+  assert {
+    condition     = github_repository_environment.this.environment == "github-plan"
+    error_message = "github and github-plan are the environments of the live/github stack."
   }
 }

@@ -4,7 +4,7 @@ variable "repository" {
 }
 
 variable "environment" {
-  description = "Name of the environment: test, quality, demo, an account (management, security, workforce), agent-app, or <name>-plan of any of those except agent-app. Names are explanatory; the four-letter keys (root, scrt, wrkf, test, qual, demo) are for AWS naming conventions in workforce-infra and are not accepted here."
+  description = "Name of the environment: test, quality, demo, an account (management, security, workforce), github (the Terraform stack of this repository), agent-app, or <name>-plan of any of those except agent-app. Names are explanatory; the four-letter keys (root, scrt, wrkf, test, qual, demo) are for AWS naming conventions in workforce-infra and are not accepted here."
   type        = string
 
   validation {
@@ -14,15 +14,15 @@ variable "environment" {
 
   # An explicit allowlist, so nothing has to opt in and a new stack cannot skip it. The names
   # are the explanatory ones used everywhere else: the environments test, quality and demo,
-  # the accounts management, security and workforce, the release App environment agent-app,
-  # and the plan environment of any of the first six. The retired qa and the key qual are
+  # the accounts management, security and workforce, github (the live/github stack itself), the
+  # release App environment agent-app, and the plan environment of any of the first seven. The retired qa and the key qual are
   # refused. A new name is a reviewed change to these lists.
   validation {
     condition = (
-      contains(["test", "quality", "demo", "management", "security", "workforce", "agent-app"], var.environment) ||
-      (endswith(var.environment, "-plan") && contains(["test", "quality", "demo", "management", "security", "workforce"], trimsuffix(var.environment, "-plan")))
+      contains(["test", "quality", "demo", "management", "security", "workforce", "github", "agent-app"], var.environment) ||
+      (endswith(var.environment, "-plan") && contains(["test", "quality", "demo", "management", "security", "workforce", "github"], trimsuffix(var.environment, "-plan")))
     )
-    error_message = "The environment name must be one of test, quality, demo, management, security, workforce, agent-app, or <name>-plan of one of the first six."
+    error_message = "The environment name must be one of test, quality, demo, management, security, workforce, github, agent-app, or <name>-plan of one of the first seven."
   }
 }
 

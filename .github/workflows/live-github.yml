@@ -1,0 +1,142 @@
+name: live/github
+
+# Plans and applies live/github as the GitHub App, never with a token. Manual (workflow_dispatch)
+# until the Apps exist and the environments carry their secrets; then it moves to pull-request
+# plans and an apply on merge (IAT-89).
+#
+# The plan unlocks the read-only role through github-plan and the read-only App's key. The
+# apply needs the maintainer's approval through github (main only), and the write App's key.
+# TF_VAR_require_app_auth makes Terraform refuse to run unless the whole App credential is
+# given, so a missing secret fails the run instead of falling back to a token.
+#
+# The repository is public: the role ARN, the role unique ID and the state bucket are
+# environment secrets, so they are masked everywhere. The App ID and installation ID are
+# environment variables (public values, like the IDs of the maintainer).
+#
+# The apply job plans again under the write role and applies that plan, because a plan file
+# is never stored: it would hold the App key, and artifacts of a public repository are public.
+# Never upload tfplan. scripts/check-workflow-guard.sh checks the guard on every job.
+on:
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: Apply after the plan (needs the approval of the github environment)
+        type: boolean
+        default: false
+
+permissions: {}
+
+jobs:
+  plan:
+    name: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: github-plan
+    concurrency:
+      group: live-github-plan-${{ github.ref }}
+      cancel-in-progress: true
+    permissions:
+      id-token: write
+      contents: read
+    env:
+      TF_IN_AUTOMATION: "true"
+      TF_VAR_require_app_auth: "true"
+      TF_VAR_aws_region: ${{ vars.AWS_REGION }}
+      TF_VAR_app_id: ${{ vars.APP_ID }}
+      TF_VAR_app_installation_id: ${{ vars.APP_INSTALLATION_ID }}
+      AWS_REGION_NAME: ${{ vars.AWS_REGION }}
+      STATE_BUCKET: ${{ secrets.STATE_BUCKET }}
+      # Registered as a secret only to be masked: the credentials action prints the role's
+      # unique ID, which decodes to the account ID.
+      AWS_ROLE_ID: ${{ secrets.AWS_ROLE_ID }}
+    defaults:
+      run:
+        working-directory: live/github
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: tf
+        working-directory: .
+        run: echo "version=$(cat .terraform-version)" >> "$GITHUB_OUTPUT"
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: ${{ steps.tf.outputs.version }}
+          terraform_wrapper: false
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+          mask-aws-account-id: true
+      - name: Init
+        run: |
+          terraform init -input=false \
+            -backend-config="bucket=$STATE_BUCKET" \
+            -backend-config="key=live/github/terraform.tfstate" \
+            -backend-config="region=$AWS_REGION_NAME"
+      # The key is read in the step that uses it and never written to the environment file or
+      # an output. -lock=false: the plan role cannot write the lockfile.
+      - name: Plan
+        run: |
+          pem=$(aws ssm get-parameter --with-decryption --name /workforce/github/app-read-key \
+            --query Parameter.Value --output text)
+          while IFS= read -r line; do echo "::add-mask::$line"; done <<<"$pem"
+          TF_VAR_app_pem=$pem terraform plan -input=false -lock=false
+
+  apply:
+    name: apply
+    if: inputs.apply
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: github
+    concurrency:
+      group: live-github-apply
+      cancel-in-progress: false
+    permissions:
+      id-token: write
+      contents: read
+    env:
+      TF_IN_AUTOMATION: "true"
+      TF_VAR_require_app_auth: "true"
+      TF_VAR_aws_region: ${{ vars.AWS_REGION }}
+      TF_VAR_app_id: ${{ vars.APP_ID }}
+      TF_VAR_app_installation_id: ${{ vars.APP_INSTALLATION_ID }}
+      AWS_REGION_NAME: ${{ vars.AWS_REGION }}
+      STATE_BUCKET: ${{ secrets.STATE_BUCKET }}
+      AWS_ROLE_ID: ${{ secrets.AWS_ROLE_ID }}
+    defaults:
+      run:
+        working-directory: live/github
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: tf
+        working-directory: .
+        run: echo "version=$(cat .terraform-version)" >> "$GITHUB_OUTPUT"
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: ${{ steps.tf.outputs.version }}
+          terraform_wrapper: false
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+          mask-aws-account-id: true
+      - name: Init
+        run: |
+          terraform init -input=false \
+            -backend-config="bucket=$STATE_BUCKET" \
+            -backend-config="key=live/github/terraform.tfstate" \
+            -backend-config="region=$AWS_REGION_NAME"
+      # Plans again under the write role and applies exactly that plan.
+      - name: Apply
+        run: |
+          pem=$(aws ssm get-parameter --with-decryption --name /workforce/github/app-write-key \
+            --query Parameter.Value --output text)
+          while IFS= read -r line; do echo "::add-mask::$line"; done <<<"$pem"
+          export TF_VAR_app_pem=$pem
+          trap 'rm -f tfplan' EXIT
+          terraform plan -input=false -out=tfplan
+          terraform apply -input=false tfplan

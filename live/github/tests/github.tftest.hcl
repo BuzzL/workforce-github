@@ -43,6 +43,27 @@ run "plan_environments_have_no_reviewer_and_any_branch" {
   }
 }
 
+run "the_github_stack_environments_are_guarded" {
+  command = apply
+
+  assert {
+    condition = (
+      module.github_apply.environment == "github" && module.github_apply.variables == { AWS_REGION = "eu-west-1" } && module.github_apply.reviewer_user_ids == toset([6116516]) &&
+      module.github_apply.can_admins_bypass == false && module.github_apply.deployment_restricted == true &&
+      module.github_apply.deployment_branches == toset(["main"])
+    )
+    error_message = "The github environment needs the maintainer as reviewer, no admin bypass and main only."
+  }
+
+  assert {
+    condition = (
+      module.github_plan.environment == "github-plan" && module.github_plan.variables == { AWS_REGION = "eu-west-1" } && length(module.github_plan.reviewer_user_ids) == 0 &&
+      module.github_plan.deployment_restricted == false && length(module.github_plan.deployment_branches) == 0
+    )
+    error_message = "The github-plan environment has no reviewer and accepts any branch."
+  }
+}
+
 # The App is all or nothing: half a credential must not silently fall back to the token.
 run "an_app_id_without_its_key_is_refused" {
   command = plan
@@ -104,4 +125,57 @@ run "an_empty_app_id_with_a_key_is_refused" {
   }
 
   expect_failures = [var.app_installation_id, var.app_pem]
+}
+
+# CI sets require_app_auth, so a missing or empty App credential fails instead of falling back.
+run "required_app_auth_refuses_the_token_fallback" {
+  command = plan
+
+  variables {
+    require_app_auth = true
+  }
+
+  expect_failures = [var.require_app_auth]
+}
+
+run "required_app_auth_refuses_empty_values" {
+  command = plan
+
+  variables {
+    require_app_auth    = true
+    app_id              = ""
+    app_installation_id = ""
+    app_pem             = ""
+  }
+
+  expect_failures = [var.require_app_auth]
+}
+
+run "required_app_auth_refuses_a_partial_credential" {
+  command = plan
+
+  variables {
+    require_app_auth    = true
+    app_id              = "1"
+    app_installation_id = "2"
+    app_pem             = ""
+  }
+
+  expect_failures = [var.app_pem]
+}
+
+run "required_app_auth_accepts_the_whole_credential" {
+  command = plan
+
+  variables {
+    require_app_auth    = true
+    app_id              = "1"
+    app_installation_id = "2"
+    app_pem             = "pem"
+  }
+
+  assert {
+    condition     = output.auth_mode == "app" && output.app_auth_required == true
+    error_message = "With the whole credential and require_app_auth the provider authenticates as the App."
+  }
 }

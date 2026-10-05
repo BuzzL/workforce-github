@@ -26,3 +26,4 @@ test:
 
 workflows:
 	actionlint
+	scripts/check-workflow-guard.sh
