@@ -48,7 +48,7 @@ run "the_github_stack_environments_are_guarded" {
 
   assert {
     condition = (
-      module.github_apply.environment == "github" && module.github_apply.reviewer_user_ids == toset([6116516]) &&
+      module.github_apply.environment == "github" && module.github_apply.variables == { AWS_REGION = "eu-west-1" } && module.github_apply.reviewer_user_ids == toset([6116516]) &&
       module.github_apply.can_admins_bypass == false && module.github_apply.deployment_restricted == true &&
       module.github_apply.deployment_branches == toset(["main"])
     )
@@ -57,7 +57,7 @@ run "the_github_stack_environments_are_guarded" {
 
   assert {
     condition = (
-      module.github_plan.environment == "github-plan" && length(module.github_plan.reviewer_user_ids) == 0 &&
+      module.github_plan.environment == "github-plan" && module.github_plan.variables == { AWS_REGION = "eu-west-1" } && length(module.github_plan.reviewer_user_ids) == 0 &&
       module.github_plan.deployment_restricted == false && length(module.github_plan.deployment_branches) == 0
     )
     error_message = "The github-plan environment has no reviewer and accepts any branch."
@@ -149,6 +149,19 @@ run "required_app_auth_refuses_empty_values" {
   }
 
   expect_failures = [var.require_app_auth]
+}
+
+run "required_app_auth_refuses_a_partial_credential" {
+  command = plan
+
+  variables {
+    require_app_auth    = true
+    app_id              = "1"
+    app_installation_id = "2"
+    app_pem             = ""
+  }
+
+  expect_failures = [var.app_pem]
 }
 
 run "required_app_auth_accepts_the_whole_credential" {

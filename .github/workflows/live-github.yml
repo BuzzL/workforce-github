@@ -12,6 +12,10 @@ name: live/github
 # The repository is public: the role ARN, the role unique ID and the state bucket are
 # environment secrets, so they are masked everywhere. The App ID and installation ID are
 # environment variables (public values, like the IDs of the maintainer).
+#
+# The apply job plans again under the write role and applies that plan, because a plan file
+# is never stored: it would hold the App key, and artifacts of a public repository are public.
+# Never upload tfplan. scripts/check-workflow-guard.sh checks the guard on every job.
 on:
   workflow_dispatch:
     inputs:
@@ -133,5 +137,6 @@ jobs:
             --query Parameter.Value --output text)
           while IFS= read -r line; do echo "::add-mask::$line"; done <<<"$pem"
           export TF_VAR_app_pem=$pem
+          trap 'rm -f tfplan' EXIT
           terraform plan -input=false -out=tfplan
           terraform apply -input=false tfplan
