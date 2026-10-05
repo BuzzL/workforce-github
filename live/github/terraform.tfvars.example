@@ -1,5 +1,8 @@
-# Copy to terraform.tfvars (gitignored). app_pem comes from the environment:
+# Copy to terraform.tfvars (gitignored).
+aws_region = "<region>"
+
+# With the write App, also set the two IDs and export the key from AWS:
+# app_id              = "<write-app-id>"
+# app_installation_id = "<installation-id>"
 # export TF_VAR_app_pem="$(aws ssm get-parameter --with-decryption --name /workforce/github/app-write-key --query Parameter.Value --output text)"
-aws_region          = "<region>"
-app_id              = "<write-app-id>"
-app_installation_id = "<installation-id>"
+# Without them, export GITHUB_TOKEN="$(gh auth token)" for a local apply by the maintainer.
