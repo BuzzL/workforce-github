@@ -28,20 +28,20 @@ run "apply_environments_are_guarded" {
   assert {
     condition = alltrue([
       for m in module.apply :
-      m.reviewer_user_ids == toset([6116516]) && m.can_admins_bypass == false && m.deployment_branches == toset(["main"])
+      m.reviewer_user_ids == toset([6116516]) && m.can_admins_bypass == false && m.deployment_restricted == true && m.deployment_branches == toset(["main"]) && m.variables == { AWS_REGION = "eu-west-1" }
     ])
     error_message = "An apply environment needs the maintainer as reviewer, no admin bypass and main only."
   }
 }
 
-run "plan_environments_unlock_only_a_plan" {
+run "plan_environments_have_no_reviewer_and_any_branch" {
   command = apply
 
   assert {
     condition = alltrue([
       for m in module.plan :
-      length(m.reviewer_user_ids) == 0 && length(m.deployment_branches) == 0
+      length(m.reviewer_user_ids) == 0 && m.deployment_restricted == false && length(m.deployment_branches) == 0 && m.variables == { AWS_REGION = "eu-west-1" }
     ])
-    error_message = "A plan environment has no reviewer and accepts any branch."
+    error_message = "A plan environment has no reviewer, accepts any branch and carries the region. That it unlocks only a read-only role is a property of the baseline in workforce-infra."
   }
 }

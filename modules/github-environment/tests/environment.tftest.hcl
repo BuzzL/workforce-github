@@ -277,6 +277,12 @@ run "outputs_mirror_the_protection" {
     reviewer_user_ids   = [6116516]
     can_admins_bypass   = false
     deployment_branches = ["main"]
+    variables           = { AWS_REGION = "eu-west-1" }
+  }
+
+  assert {
+    condition     = output.deployment_restricted == true && output.variables == { AWS_REGION = "eu-west-1" }
+    error_message = "The outputs must show that deployment is restricted and carry the variables."
   }
 
   assert {
