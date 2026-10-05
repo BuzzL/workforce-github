@@ -2,10 +2,7 @@
 mock_provider "github" {}
 
 variables {
-  aws_region          = "eu-west-1"
-  app_id              = "1"
-  app_installation_id = "2"
-  app_pem             = "pem"
+  aws_region = "eu-west-1"
 }
 
 run "environments_are_named_not_keyed" {
@@ -43,5 +40,26 @@ run "plan_environments_have_no_reviewer_and_any_branch" {
       length(m.reviewer_user_ids) == 0 && m.deployment_restricted == false && length(m.deployment_branches) == 0 && m.variables == { AWS_REGION = "eu-west-1" }
     ])
     error_message = "A plan environment has no reviewer, accepts any branch and carries the region. That it unlocks only a read-only role is a property of the baseline in workforce-infra."
+  }
+}
+
+# The App is all or nothing: half a credential must not silently fall back to the token.
+run "an_app_id_without_its_key_is_refused" {
+  command = plan
+
+  variables {
+    app_id = "1"
+  }
+
+  expect_failures = [var.app_installation_id, var.app_pem]
+}
+
+run "the_app_credential_is_accepted_whole" {
+  command = plan
+
+  variables {
+    app_id              = "1"
+    app_installation_id = "2"
+    app_pem             = "pem"
   }
 }

@@ -16,17 +16,30 @@ variable "aws_region" {
 }
 
 variable "app_id" {
-  description = "ID of the write GitHub App."
+  description = "ID of the write GitHub App. Null falls back to the maintainer's GITHUB_TOKEN for a local apply."
   type        = string
+  default     = null
 }
 
 variable "app_installation_id" {
   description = "Installation ID of the write GitHub App on the workforce repositories."
   type        = string
+  default     = null
+
+  validation {
+    condition     = (var.app_id == null) == (var.app_installation_id == null)
+    error_message = "app_id and app_installation_id are set together, or both left null for the GITHUB_TOKEN fallback."
+  }
 }
 
 variable "app_pem" {
   description = "Private key of the write App, read from AWS at run time."
   type        = string
   sensitive   = true
+  default     = null
+
+  validation {
+    condition     = (var.app_id == null) == (var.app_pem == null)
+    error_message = "app_pem is set together with app_id, or both left null for the GITHUB_TOKEN fallback."
+  }
 }
