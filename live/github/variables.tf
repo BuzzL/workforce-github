@@ -16,7 +16,7 @@ variable "aws_region" {
 }
 
 variable "app_id" {
-  description = "ID of the write GitHub App. Null falls back to the maintainer's GITHUB_TOKEN for a local apply."
+  description = "ID of the write GitHub App. Null falls back to the maintainer's GITHUB_TOKEN for a local apply; never in CI (require_app_auth)."
   type        = string
   default     = null
 }
