@@ -266,3 +266,27 @@ run "an_account_environment_keeps_its_name" {
     error_message = "An account environment keeps its name."
   }
 }
+
+# The outputs are what a stack asserts on: they must mirror the protection that was set.
+run "outputs_mirror_the_protection" {
+  command = apply
+
+  variables {
+    repository          = "workforce-infra"
+    environment         = "test"
+    reviewer_user_ids   = [6116516]
+    can_admins_bypass   = false
+    deployment_branches = ["main"]
+    variables           = { AWS_REGION = "eu-west-1" }
+  }
+
+  assert {
+    condition     = output.deployment_restricted == true && output.variables == { AWS_REGION = "eu-west-1" }
+    error_message = "The outputs must show that deployment is restricted and carry the variables."
+  }
+
+  assert {
+    condition     = output.environment == "test" && output.can_admins_bypass == false && output.reviewer_user_ids == toset([6116516]) && output.deployment_branches == toset(["main"])
+    error_message = "The outputs must mirror the protection of the environment."
+  }
+}

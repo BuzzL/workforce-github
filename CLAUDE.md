@@ -17,8 +17,8 @@ This repo is the **GitHub provider** side of the workforce: repos, rulesets, Git
 ## Layout
 
 - `live/` and `modules/` are the only places Terraform may live: `scripts/stacks.sh` fails on a `.tf` anywhere else, so no gate can skip it.
-- `live/`: root stacks (Terraform), each with its own state key. None yet.
-- `modules/`: reusable modules, each with mocked `terraform test`s. None yet.
+- `live/`: root stacks (Terraform), each with its own state key. `live/github` holds the GitHub Environments of `workforce-infra` for the environment accounts (`test`, `quality`, `demo` and their `-plan` twins), applied locally by the maintainer for now. Their secrets (`AWS_ROLE_ARN`, `AWS_ROLE_ID`, `STATE_BUCKET`) are set out of band from the baseline stack outputs; the names are checked, never the values.
+- `modules/`: reusable modules, each with mocked `terraform test`s. Today `github-environment`.
 - `docs/GITHUB_AS_CODE.md`: decision record (credential, personal account vs organization, import, secrets).
 - `Makefile`, `scripts/`: `make check` runs fmt, validate, tflint, version and Dependabot conventions, trivy (secrets and config scan only: it has no checks for GitHub settings, so protection is proven by literal assertions in `terraform test`), `terraform test` and actionlint. CI runs the same targets. Loops live in `scripts/each.sh`, not in recipes (macOS Make 3.81). Terraform version: `.terraform-version`.
 - Each stack or module declares `required_version` (>= 1.9) and pins the GitHub provider (`integrations/github`) to `~> 6`; `make versions` enforces the values, tflint that constraints exist. A stack that declares providers must be in the terraform block of `.github/dependabot.yml` (`make dependabot`).
