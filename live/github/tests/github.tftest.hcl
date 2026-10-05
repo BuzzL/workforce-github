@@ -62,4 +62,46 @@ run "the_app_credential_is_accepted_whole" {
     app_installation_id = "2"
     app_pem             = "pem"
   }
+
+  # The mocked provider is never configured, so this mirrors the selection made in providers.tf.
+  assert {
+    condition     = output.auth_mode == "app"
+    error_message = "With an app_id the provider authenticates as the App."
+  }
+}
+
+run "no_app_means_the_token_fallback" {
+  command = plan
+
+  assert {
+    condition     = output.auth_mode == "token"
+    error_message = "Without an app_id the provider falls back to the maintainer's token."
+  }
+}
+
+run "an_empty_app_id_counts_as_unset" {
+  command = plan
+
+  variables {
+    app_id              = ""
+    app_installation_id = ""
+    app_pem             = ""
+  }
+
+  assert {
+    condition     = output.auth_mode == "token"
+    error_message = "Empty values, such as a missing CI secret, count as unset."
+  }
+}
+
+run "an_empty_app_id_with_a_key_is_refused" {
+  command = plan
+
+  variables {
+    app_id              = ""
+    app_installation_id = "2"
+    app_pem             = "pem"
+  }
+
+  expect_failures = [var.app_installation_id, var.app_pem]
 }

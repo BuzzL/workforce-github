@@ -27,8 +27,8 @@ variable "app_installation_id" {
   default     = null
 
   validation {
-    condition     = (var.app_id == null) == (var.app_installation_id == null)
-    error_message = "app_id and app_installation_id are set together, or both left null for the GITHUB_TOKEN fallback."
+    condition     = (var.app_id == null || var.app_id == "") == (var.app_installation_id == null || var.app_installation_id == "")
+    error_message = "app_id and app_installation_id are set together, or both left null or empty for the GITHUB_TOKEN fallback."
   }
 }
 
@@ -39,7 +39,7 @@ variable "app_pem" {
   default     = null
 
   validation {
-    condition     = (var.app_id == null) == (var.app_pem == null)
-    error_message = "app_pem is set together with app_id, or both left null for the GITHUB_TOKEN fallback."
+    condition     = (var.app_id == null || var.app_id == "") == (var.app_pem == null || var.app_pem == "")
+    error_message = "app_pem is set together with app_id, or both left null or empty for the GITHUB_TOKEN fallback."
   }
 }
