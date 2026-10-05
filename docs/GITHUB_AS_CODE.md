@@ -43,6 +43,10 @@ Decided: a separate repo, `workforce-github`. It reuses the state bucket but kee
 - The App can delete repos (Administration) but cannot create them on a personal account, so a planned replacement of `github_repository` would delete and then fail. The module sets `lifecycle { prevent_destroy = true }` and `archive_on_destroy = true`, and CI only applies a plan with no creates or deletes of repositories (creation stays a local apply).
 - Secret values end up in Terraform state. **Decided: secrets are not managed in Terraform.** `integrations/github` v6.13.0 has no write-only attribute or ephemeral resource for environment secrets, and Terraform cannot seal a value with GitHub's public key itself, so any value it writes lands in the state. The environments and their protection are in Terraform (`modules/github-environment`); the secrets (`AWS_ROLE_ARN`, `AWS_ROLE_ID`, `STATE_BUCKET`) are set out of band by `scripts/set-account-environment-secrets.sh` in workforce-infra from the stack outputs, and only their names are checked. `make versions` fails if a `github_*secret*` resource appears in a stack or module (a guard rail: it cannot see one reached through a module from elsewhere, so review still has to), and the module rejects variable names that look like secrets, because variables are not masked in a public repo's logs. Rejected: SOPS-encrypted values decrypted by Terraform (the values still reach the state, and the ciphertext would be public), pre-sealed `encrypted_value` (needs a script anyway).
 
+## Environments of the environment accounts
+
+`live/github` creates, in `workforce-infra`, the apply environments `test`, `quality` and `demo` (the maintainer as required reviewer, no admin bypass, `main` only) and their `-plan` twins (no reviewer, any branch), each with the plain variable `AWS_REGION`. They are in `workforce-infra` because the baseline roles of `bootstrap/accounts/<name>` trust the OIDC subjects of that repository. The secrets `AWS_ROLE_ARN`, `AWS_ROLE_ID` and `STATE_BUCKET` of each are set out of band from the baseline stack outputs (`terraform output -raw apply_role_arn`, `plan_role_arn`, `apply_role_id`, `plan_role_id`), never committed or printed; only their names are checked (`gh secret list --env <name> --repo BuzzL/workforce-infra`). The stack is applied locally with the maintainer's explicit yes until the CI roles of this repo exist.
+
 ## Import check
 
 Not run yet. Plan: write the module, import the three repos, expect no diff. Known risks: `require_extra_approval_for_unattributed_changes` is true on infra and testbed but false on images, so one default gives a diff somewhere (make it an input); ruleset `integration_id` for required checks (15368, GitHub Actions) and `required_reviewers` must be expressible in the provider, otherwise the plan will show drift.
@@ -63,5 +67,5 @@ Not run yet. Plan: write the module, import the three repos, expect no diff. Kno
 ## Next
 
 1. `modules/github-repo` with mocked `terraform test` (ruleset, no bypass, environments, both owner types).
-2. `live/github` stack importing the four existing repos, plan shows no drift.
+2. Extend `live/github` to import the four existing repos, plan shows no drift (it holds the environments of the environment accounts today).
 3. Infra PR: state key and roles for this repo.
