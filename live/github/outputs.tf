@@ -12,3 +12,8 @@ output "auth_mode" {
   description = "How the provider authenticates: app (the write App) or token (GITHUB_TOKEN, a local apply by the maintainer)."
   value       = local.use_app ? "app" : "token"
 }
+
+output "app_auth_required" {
+  description = "Whether this run refuses the token fallback (set by the CI workflow)."
+  value       = var.require_app_auth
+}

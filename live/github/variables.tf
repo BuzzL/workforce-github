@@ -43,3 +43,16 @@ variable "app_pem" {
     error_message = "app_pem is set together with app_id, or both left null or empty for the GITHUB_TOKEN fallback."
   }
 }
+
+variable "require_app_auth" {
+  description = "Set by the CI workflow: refuses to run unless the whole write App credential is given, so CI can never fall back to a token. Left false only for a local apply by the maintainer."
+  type        = bool
+  default     = false
+
+  validation {
+    condition = !var.require_app_auth || alltrue([
+      for v in [var.app_id, var.app_installation_id, var.app_pem] : v != null && v != ""
+    ])
+    error_message = "require_app_auth is set: app_id, app_installation_id and app_pem must all be given (the token fallback is not allowed here)."
+  }
+}

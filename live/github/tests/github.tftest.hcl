@@ -105,3 +105,43 @@ run "an_empty_app_id_with_a_key_is_refused" {
 
   expect_failures = [var.app_installation_id, var.app_pem]
 }
+
+# CI sets require_app_auth, so a missing or empty App credential fails instead of falling back.
+run "required_app_auth_refuses_the_token_fallback" {
+  command = plan
+
+  variables {
+    require_app_auth = true
+  }
+
+  expect_failures = [var.require_app_auth]
+}
+
+run "required_app_auth_refuses_empty_values" {
+  command = plan
+
+  variables {
+    require_app_auth    = true
+    app_id              = ""
+    app_installation_id = ""
+    app_pem             = ""
+  }
+
+  expect_failures = [var.require_app_auth]
+}
+
+run "required_app_auth_accepts_the_whole_credential" {
+  command = plan
+
+  variables {
+    require_app_auth    = true
+    app_id              = "1"
+    app_installation_id = "2"
+    app_pem             = "pem"
+  }
+
+  assert {
+    condition     = output.auth_mode == "app" && output.app_auth_required == true
+    error_message = "With the whole credential and require_app_auth the provider authenticates as the App."
+  }
+}
