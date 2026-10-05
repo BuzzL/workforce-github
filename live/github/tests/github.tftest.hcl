@@ -43,6 +43,27 @@ run "plan_environments_have_no_reviewer_and_any_branch" {
   }
 }
 
+run "the_github_stack_environments_are_guarded" {
+  command = apply
+
+  assert {
+    condition = (
+      module.github_apply.environment == "github" && module.github_apply.reviewer_user_ids == toset([6116516]) &&
+      module.github_apply.can_admins_bypass == false && module.github_apply.deployment_restricted == true &&
+      module.github_apply.deployment_branches == toset(["main"])
+    )
+    error_message = "The github environment needs the maintainer as reviewer, no admin bypass and main only."
+  }
+
+  assert {
+    condition = (
+      module.github_plan.environment == "github-plan" && length(module.github_plan.reviewer_user_ids) == 0 &&
+      module.github_plan.deployment_restricted == false && length(module.github_plan.deployment_branches) == 0
+    )
+    error_message = "The github-plan environment has no reviewer and accepts any branch."
+  }
+}
+
 # The App is all or nothing: half a credential must not silently fall back to the token.
 run "an_app_id_without_its_key_is_refused" {
   command = plan

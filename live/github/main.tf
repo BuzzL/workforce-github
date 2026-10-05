@@ -35,3 +35,28 @@ module "plan" {
   can_admins_bypass = true
   variables         = { AWS_REGION = var.aws_region }
 }
+
+# The environments of this repository's own CI (IAT-89). github-infra-github and
+# github-infra-github-plan in workforce-infra trust one subject per environment: apply (the
+# maintainer must approve, no admin bypass, main only) unlocks the role that writes the state
+# and reads the write App's key, and github-plan (no reviewer, any branch) only the read-only
+# role. Their secrets are set out of band, like the others.
+module "github_apply" {
+  source = "../../modules/github-environment"
+
+  repository          = "workforce-github"
+  environment         = "github"
+  reviewer_user_ids   = [var.maintainer_user_id]
+  can_admins_bypass   = false
+  deployment_branches = ["main"]
+  variables           = { AWS_REGION = var.aws_region }
+}
+
+module "github_plan" {
+  source = "../../modules/github-environment"
+
+  repository        = "workforce-github"
+  environment       = "github-plan"
+  can_admins_bypass = true
+  variables         = { AWS_REGION = var.aws_region }
+}
