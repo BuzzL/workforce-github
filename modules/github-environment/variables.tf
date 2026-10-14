@@ -4,7 +4,7 @@ variable "repository" {
 }
 
 variable "environment" {
-  description = "Name of the environment: test, quality, demo, an account (management, security, workforce), github (the Terraform stack of this repository), agent-app, or <name>-plan of any of those except agent-app. Names are explanatory; the four-letter keys (root, scrt, wrkf, test, qual, demo) are for AWS naming conventions in workforce-infra and are not accepted here."
+  description = "Name of the environment: test, quality, demo, an account (management, security, workforce), github (the Terraform stack of this repository), agent-app, <name>-plan of any of those except agent-app, or <name>-matrix of test, quality and demo (the permission-matrix CI environments). Names are explanatory; the four-letter keys (root, scrt, wrkf, test, qual, demo) are for AWS naming conventions in workforce-infra and are not accepted here."
   type        = string
 
   validation {
@@ -15,14 +15,16 @@ variable "environment" {
   # An explicit allowlist, so nothing has to opt in and a new stack cannot skip it. The names
   # are the explanatory ones used everywhere else: the environments test, quality and demo,
   # the accounts management, security and workforce, github (the live/github stack itself), the
-  # release App environment agent-app, and the plan environment of any of the first seven. The retired qa and the key qual are
-  # refused. A new name is a reviewed change to these lists.
+  # release App environment agent-app, the plan environment of any of the first seven, and the
+  # permission-matrix environment (<name>-matrix) of test, quality and demo. The retired qa and
+  # the key qual are refused. A new name is a reviewed change to these lists.
   validation {
     condition = (
       contains(["test", "quality", "demo", "management", "security", "workforce", "github", "agent-app"], var.environment) ||
-      (endswith(var.environment, "-plan") && contains(["test", "quality", "demo", "management", "security", "workforce", "github"], trimsuffix(var.environment, "-plan")))
+      (endswith(var.environment, "-plan") && contains(["test", "quality", "demo", "management", "security", "workforce", "github"], trimsuffix(var.environment, "-plan"))) ||
+      (endswith(var.environment, "-matrix") && contains(["test", "quality", "demo"], trimsuffix(var.environment, "-matrix")))
     )
-    error_message = "The environment name must be one of test, quality, demo, management, security, workforce, github, agent-app, or <name>-plan of one of the first seven."
+    error_message = "The environment name must be one of test, quality, demo, management, security, workforce, github, agent-app, <name>-plan of one of the first seven, or <name>-matrix of test, quality or demo."
   }
 }
 
@@ -84,6 +86,22 @@ variable "deployment_branches" {
   validation {
     condition     = alltrue([for b in var.deployment_branches : length(trimspace(b)) > 0])
     error_message = "A deployment branch must not be empty."
+  }
+}
+
+variable "secret_names" {
+  description = "Names of the secrets the environment expects, values set out of band. Only the names live in code: a secret value set through Terraform would be kept in the state, so this never carries one. The names document the contract and are asserted in terraform test; the maintainer sets the values on the environment later. SCREAMING_SNAKE_CASE, so a value (NAME=value) or a lowercase name is refused."
+  type        = list(string)
+  default     = []
+
+  validation {
+    condition     = alltrue([for n in var.secret_names : can(regex("^[A-Z][A-Z0-9_]*$", n))])
+    error_message = "A secret name is SCREAMING_SNAKE_CASE (uppercase letters, digits and underscores, starting with a letter) and carries no value: declare names only, never values."
+  }
+
+  validation {
+    condition     = length(var.secret_names) == length(toset(var.secret_names))
+    error_message = "A secret name must not be declared twice."
   }
 }
 
