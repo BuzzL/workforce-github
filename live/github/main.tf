@@ -60,3 +60,29 @@ module "github_plan" {
   can_admins_bypass = true
   variables         = { AWS_REGION = var.aws_region }
 }
+
+# The permission-matrix CI environments (IAT-46). permission-matrix.yml in workforce-infra runs
+# the allowed/denied matrix on pull requests, gated on the MATRIX_ENABLED repo variable, and
+# reads the matrix role secrets from an <env>-matrix environment. Each one is the home of those
+# secrets, set out of band like the others; only the names live here. demo-matrix is the demo
+# reviewer gate (the maintainer must approve, no admin bypass, main only); test-matrix and
+# quality-matrix need no reviewer. The required-check wiring and MATRIX_ENABLED stay off until
+# the coordinated rollout (workforce-infra), so a required-but-skipped check cannot hang.
+locals {
+  matrix_secret_names = ["MATRIX_RUNNER_ROLE_ARN", "MATRIX_AGENT_ROLE_ARN", "MATRIX_EXTERNAL_ID", "MATRIX_VIA_ROLE_ARN"]
+}
+
+module "matrix" {
+  source   = "../../modules/github-environment"
+  for_each = local.environments
+
+  repository   = local.repository
+  environment  = "${each.key}-matrix"
+  secret_names = local.matrix_secret_names
+  variables    = { AWS_REGION = var.aws_region }
+
+  # demo-matrix is the demo reviewer gate; test and quality need no reviewer.
+  reviewer_user_ids   = each.key == "demo" ? [var.maintainer_user_id] : []
+  can_admins_bypass   = each.key != "demo"
+  deployment_branches = each.key == "demo" ? ["main"] : []
+}

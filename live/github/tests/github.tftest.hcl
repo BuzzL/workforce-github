@@ -64,6 +64,43 @@ run "the_github_stack_environments_are_guarded" {
   }
 }
 
+run "matrix_environments_are_named_with_their_secrets" {
+  command = apply
+
+  assert {
+    condition     = toset(keys(module.matrix)) == toset(["demo", "quality", "test"]) && module.matrix["quality"].environment == "quality-matrix"
+    error_message = "The matrix environments are test-matrix, quality-matrix and demo-matrix: the names with -matrix, never the keys."
+  }
+
+  assert {
+    condition = alltrue([
+      for m in module.matrix :
+      m.secret_names == toset(["MATRIX_RUNNER_ROLE_ARN", "MATRIX_AGENT_ROLE_ARN", "MATRIX_EXTERNAL_ID", "MATRIX_VIA_ROLE_ARN"]) && m.variables == { AWS_REGION = "eu-west-1" }
+    ])
+    error_message = "Each matrix environment declares the four matrix secret names (values out of band) and carries the region."
+  }
+}
+
+run "demo_matrix_is_reviewer_gated_and_the_others_are_not" {
+  command = apply
+
+  assert {
+    condition = (
+      module.matrix["demo"].reviewer_user_ids == toset([6116516]) && module.matrix["demo"].can_admins_bypass == false &&
+      module.matrix["demo"].deployment_restricted == true && module.matrix["demo"].deployment_branches == toset(["main"])
+    )
+    error_message = "demo-matrix is the demo reviewer gate: the maintainer as reviewer, no admin bypass and main only."
+  }
+
+  assert {
+    condition = alltrue([
+      for k in ["test", "quality"] :
+      length(module.matrix[k].reviewer_user_ids) == 0 && module.matrix[k].deployment_restricted == false && length(module.matrix[k].deployment_branches) == 0
+    ])
+    error_message = "test-matrix and quality-matrix need no reviewer and accept any branch."
+  }
+}
+
 # The App is all or nothing: half a credential must not silently fall back to the token.
 run "an_app_id_without_its_key_is_refused" {
   command = plan
