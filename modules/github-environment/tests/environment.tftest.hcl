@@ -237,6 +237,33 @@ run "the_plan_environment_of_agent_app_does_not_exist" {
   expect_failures = [var.environment]
 }
 
+run "a_matrix_environment_keeps_its_name" {
+  command = plan
+
+  variables {
+    repository        = "workforce-infra"
+    environment       = "demo-matrix"
+    can_admins_bypass = false
+  }
+
+  assert {
+    condition     = github_repository_environment.this.environment == "demo-matrix"
+    error_message = "A <name>-matrix environment of test, quality or demo is accepted."
+  }
+}
+
+run "a_matrix_environment_outside_the_three_is_refused" {
+  command = plan
+
+  variables {
+    repository        = "workforce-infra"
+    environment       = "management-matrix"
+    can_admins_bypass = true
+  }
+
+  expect_failures = [var.environment]
+}
+
 run "plan_environments_keep_their_names" {
   command = plan
 

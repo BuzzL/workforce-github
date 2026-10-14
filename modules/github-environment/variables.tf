@@ -4,7 +4,7 @@ variable "repository" {
 }
 
 variable "environment" {
-  description = "Name of the environment: test, quality, demo, an account (management, security, workforce), github (the Terraform stack of this repository), agent-app, or <name>-plan of any of those except agent-app. Names are explanatory; the four-letter keys (root, scrt, wrkf, test, qual, demo) are for AWS naming conventions in workforce-infra and are not accepted here."
+  description = "Name of the environment: test, quality, demo, an account (management, security, workforce), github (the Terraform stack of this repository), agent-app, <name>-plan of any of those except agent-app, or <name>-matrix of test, quality and demo (the permission-matrix CI environments). Names are explanatory; the four-letter keys (root, scrt, wrkf, test, qual, demo) are for AWS naming conventions in workforce-infra and are not accepted here."
   type        = string
 
   validation {
@@ -15,14 +15,16 @@ variable "environment" {
   # An explicit allowlist, so nothing has to opt in and a new stack cannot skip it. The names
   # are the explanatory ones used everywhere else: the environments test, quality and demo,
   # the accounts management, security and workforce, github (the live/github stack itself), the
-  # release App environment agent-app, and the plan environment of any of the first seven. The retired qa and the key qual are
-  # refused. A new name is a reviewed change to these lists.
+  # release App environment agent-app, the plan environment of any of the first seven, and the
+  # permission-matrix environment (<name>-matrix) of test, quality and demo. The retired qa and
+  # the key qual are refused. A new name is a reviewed change to these lists.
   validation {
     condition = (
       contains(["test", "quality", "demo", "management", "security", "workforce", "github", "agent-app"], var.environment) ||
-      (endswith(var.environment, "-plan") && contains(["test", "quality", "demo", "management", "security", "workforce", "github"], trimsuffix(var.environment, "-plan")))
+      (endswith(var.environment, "-plan") && contains(["test", "quality", "demo", "management", "security", "workforce", "github"], trimsuffix(var.environment, "-plan"))) ||
+      (endswith(var.environment, "-matrix") && contains(["test", "quality", "demo"], trimsuffix(var.environment, "-matrix")))
     )
-    error_message = "The environment name must be one of test, quality, demo, management, security, workforce, github, agent-app, or <name>-plan of one of the first seven."
+    error_message = "The environment name must be one of test, quality, demo, management, security, workforce, github, agent-app, <name>-plan of one of the first seven, or <name>-matrix of test, quality or demo."
   }
 }
 
