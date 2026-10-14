@@ -27,3 +27,8 @@ output "variables" {
   description = "Plain variables of the environment, name to value."
   value       = { for k, v in github_actions_environment_variable.this : k => v.value }
 }
+
+output "secret_names" {
+  description = "Names of the secrets the environment expects (values set out of band, never managed here)."
+  value       = toset(var.secret_names)
+}

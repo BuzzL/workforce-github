@@ -77,6 +77,49 @@ run "plan_environment_has_no_reviewer_and_any_branch" {
   }
 }
 
+# Secret names are declared in code; the values are set out of band and never managed here.
+run "secret_names_are_declared_without_values" {
+  command = apply
+
+  variables {
+    repository        = "workforce-infra"
+    environment       = "demo-matrix"
+    can_admins_bypass = false
+    secret_names      = ["MATRIX_RUNNER_ROLE_ARN", "MATRIX_AGENT_ROLE_ARN", "MATRIX_EXTERNAL_ID", "MATRIX_VIA_ROLE_ARN"]
+  }
+
+  assert {
+    condition     = output.secret_names == toset(["MATRIX_RUNNER_ROLE_ARN", "MATRIX_AGENT_ROLE_ARN", "MATRIX_EXTERNAL_ID", "MATRIX_VIA_ROLE_ARN"])
+    error_message = "The declared secret names are exposed for a stack to assert on."
+  }
+}
+
+run "a_secret_name_carrying_a_value_is_refused" {
+  command = plan
+
+  variables {
+    repository        = "workforce-infra"
+    environment       = "demo-matrix"
+    can_admins_bypass = false
+    secret_names      = ["MATRIX_EXTERNAL_ID=super-secret"]
+  }
+
+  expect_failures = [var.secret_names]
+}
+
+run "a_lowercase_secret_name_is_refused" {
+  command = plan
+
+  variables {
+    repository        = "workforce-infra"
+    environment       = "demo-matrix"
+    can_admins_bypass = false
+    secret_names      = ["matrix_external_id"]
+  }
+
+  expect_failures = [var.secret_names]
+}
+
 run "team_reviewers_need_an_organization" {
   command = plan
 

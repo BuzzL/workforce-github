@@ -89,6 +89,22 @@ variable "deployment_branches" {
   }
 }
 
+variable "secret_names" {
+  description = "Names of the secrets the environment expects, values set out of band. Only the names live in code: a secret value set through Terraform would be kept in the state, so this never carries one. The names document the contract and are asserted in terraform test; the maintainer sets the values on the environment later. SCREAMING_SNAKE_CASE, so a value (NAME=value) or a lowercase name is refused."
+  type        = list(string)
+  default     = []
+
+  validation {
+    condition     = alltrue([for n in var.secret_names : can(regex("^[A-Z][A-Z0-9_]*$", n))])
+    error_message = "A secret name is SCREAMING_SNAKE_CASE (uppercase letters, digits and underscores, starting with a letter) and carries no value: declare names only, never values."
+  }
+
+  validation {
+    condition     = length(var.secret_names) == length(toset(var.secret_names))
+    error_message = "A secret name must not be declared twice."
+  }
+}
+
 variable "variables" {
   description = "Plain (non-secret) environment variables, name to value, such as AWS_REGION. Variables are not masked in the logs of a public repository and live in the Terraform state: a name that looks like a secret or one of the values CI keeps secret is rejected."
   type        = map(string)
