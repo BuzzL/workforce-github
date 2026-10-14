@@ -17,3 +17,8 @@ output "app_auth_required" {
   description = "Whether this run refuses the token fallback (set by the CI workflow)."
   value       = var.require_app_auth
 }
+
+output "infra_required_checks" {
+  description = "Required status checks of the main ruleset of workforce-infra."
+  value       = sort([for c in github_repository_ruleset.infra_main.rules[0].required_status_checks[0].required_check : c.context])
+}

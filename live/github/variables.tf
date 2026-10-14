@@ -56,3 +56,9 @@ variable "require_app_auth" {
     error_message = "require_app_auth is set: app_id, app_installation_id and app_pem must all be given (the token fallback is not allowed here)."
   }
 }
+
+variable "require_permission_matrix" {
+  description = "Require the permission-matrix checks on main of workforce-infra. Turn on only after MATRIX_ENABLED is \"true\" there and the job has reported the expanded names on a pull request; while it is off the checks never arrive and every pull request blocks."
+  type        = bool
+  default     = false
+}

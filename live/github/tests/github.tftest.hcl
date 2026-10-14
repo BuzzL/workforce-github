@@ -1,6 +1,11 @@
 # Literal assertions on purpose: a change to a protection rule must show up as a diff here.
 mock_provider "github" {}
 
+# A mocked provider cannot import; the override stands in for the imported ruleset.
+override_resource {
+  target = github_repository_ruleset.infra_main
+}
+
 variables {
   aws_region = "eu-west-1"
 }
@@ -214,5 +219,69 @@ run "required_app_auth_accepts_the_whole_credential" {
   assert {
     condition     = output.auth_mode == "app" && output.app_auth_required == true
     error_message = "With the whole credential and require_app_auth the provider authenticates as the App."
+  }
+}
+
+run "the_infra_main_ruleset_keeps_its_protection" {
+  command = apply
+
+  assert {
+    condition = (
+      github_repository_ruleset.infra_main.repository == "workforce-infra" && github_repository_ruleset.infra_main.enforcement == "active" &&
+      length(github_repository_ruleset.infra_main.bypass_actors) == 0 &&
+      github_repository_ruleset.infra_main.conditions[0].ref_name[0].include == tolist(["~DEFAULT_BRANCH"]) &&
+      github_repository_ruleset.infra_main.rules[0].deletion == true && github_repository_ruleset.infra_main.rules[0].non_fast_forward == true
+    )
+    error_message = "The main ruleset of workforce-infra targets the default branch, blocks deletion and force pushes, and has no bypass actors."
+  }
+
+  assert {
+    condition = (
+      github_repository_ruleset.infra_main.rules[0].pull_request[0].required_approving_review_count == 1 &&
+      github_repository_ruleset.infra_main.rules[0].pull_request[0].dismiss_stale_reviews_on_push == true &&
+      github_repository_ruleset.infra_main.rules[0].pull_request[0].require_code_owner_review == true &&
+      github_repository_ruleset.infra_main.rules[0].pull_request[0].require_last_push_approval == true &&
+      github_repository_ruleset.infra_main.rules[0].pull_request[0].required_review_thread_resolution == true &&
+      github_repository_ruleset.infra_main.rules[0].pull_request[0].allowed_merge_methods == tolist(["squash"])
+    )
+    error_message = "A pull request to main needs one code-owner approval after the last push, resolved threads, and is squash-merged."
+  }
+
+  assert {
+    condition = alltrue([
+      for c in github_repository_ruleset.infra_main.rules[0].required_status_checks[0].required_check : c.integration_id == 15368
+    ])
+    error_message = "Every required check must come from GitHub Actions."
+  }
+}
+
+# A skipped job reports its unexpanded name, so the matrix checks cannot be required by default.
+run "the_permission_matrix_is_not_required_by_default" {
+  command = apply
+
+  assert {
+    condition     = output.infra_required_checks == sort(["gitleaks", "tooling-selftest", "conventions", "tflint", "validate", "fmt", "tf-test", "trivy", "workflows"])
+    error_message = "By default the required checks are the nine CI checks, without the permission matrix."
+  }
+}
+
+run "the_permission_matrix_can_be_required" {
+  command = apply
+
+  variables {
+    require_permission_matrix = true
+  }
+
+  assert {
+    condition = output.infra_required_checks == sort([
+      "gitleaks", "tooling-selftest", "conventions", "tflint", "validate", "fmt", "tf-test", "trivy", "workflows",
+      "permission-matrix agent test", "permission-matrix agent quality", "permission-matrix agent demo",
+    ])
+    error_message = "With require_permission_matrix the three expanded permission-matrix checks are required too."
+  }
+
+  assert {
+    condition     = alltrue([for c in output.infra_required_checks : !strcontains(c, "$${{")])
+    error_message = "An unexpanded job name is what a skipped job reports; requiring it would pass a skipped matrix."
   }
 }
