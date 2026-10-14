@@ -7,3 +7,7 @@ aws_region = "<region>"
 # export TF_VAR_app_pem="$(aws ssm get-parameter --with-decryption --name /workforce/github/app-write-key --query Parameter.Value --output text)"
 # Without them, export GITHUB_TOKEN="$(gh auth token)" for a local apply by the maintainer,
 # until the write App exists. CI sets require_app_auth and always needs the App.
+
+# Only after MATRIX_ENABLED is "true" in workforce-infra and the three permission-matrix
+# checks have passed on a pull request (docs/GITHUB_AS_CODE.md):
+# require_permission_matrix = true
